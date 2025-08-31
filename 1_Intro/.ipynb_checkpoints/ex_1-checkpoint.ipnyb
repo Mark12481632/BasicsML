@@ -1,0 +1,288 @@
+%% Cell type:markdown id: tags:
+
+![BridgingAI Logo](../bridgingai_logo.png)
+
+%% Cell type:markdown id: tags:
+
+# Basics of Machine Learning - Excercise 1
+
+Welcome to the programming exercises for _Basics of Machine Learning_!
+These notebooks are not graded, but they give you the opportunity to practice what you have learned in the lectures.
+We will provide sample solutions for all exercises, but we highly recommend trying to solve them yourself first.
+This way, you strengthen your Python skills, improve your understanding of the topics - and of course it is very rewarding to see your code working!
+
+This week, we only make sure your environment is working and recap basic Numpy functionality, in particular arrays and broadcasting - play around with the code to get used to it!
+
+%% Cell type:markdown id: tags:
+
+# Q1: Environment Check
+Let's start by checking your environment.
+Run the cell below; if your environment is set up properly, you should see a 3D plot of a function with two local maxima. This is an example of the probability density distribution of a Gaussian Mixture Model, one of the methods that you will learn about later in the course!
+
+%% Cell type:code id: tags:
+
+``` python
+import numpy as np
+import sklearn
+from PIL import Image
+from matplotlib import pyplot as plt, cm
+from mpl_toolkits.mplot3d import Axes3D
+from scipy.stats import multivariate_normal
+
+# Gaussian mixture parameters
+mu1, sigma1 = [1, 1], [[1, 0.5], [0.5, 1]]
+mu2, sigma2 = [-1, -1], [[1, -0.7], [-0.7, 1]]
+
+# Create grid and multivariate normal
+x = np.linspace(-3, 3, 100)
+y = np.linspace(-3, 3, 100)
+X, Y = np.meshgrid(x, y)
+pos = np.stack([X, Y], axis=-1)
+
+# Create an object to calculate the density of each distribution
+rv1 = multivariate_normal(mu1, sigma1)
+rv2 = multivariate_normal(mu2, sigma2)
+
+# Compute the mixture's probability density function
+pdf = 0.5 * rv1.pdf(pos) + 0.5 * rv2.pdf(pos)
+
+# Make a 3D plot
+ax = plt.axes(projection="3d")
+surf = ax.plot_surface(X, Y, pdf, facecolors=cm.viridis(pdf / pdf.max()))
+# transparent facecolors make it a wireframe plot
+surf.set_facecolor((0, 0, 0, 0))
+
+plt.show()
+```
+
+%% Cell type:markdown id: tags:
+
+# Q2: Numpy Recap
+In the programming exercises, we will make heavy use of [Numpy](https://numpy.org/doc/stable/).
+To quote the documentation:
+> NumPy is the fundamental package for scientific computing in Python. It is a Python library that provides a multidimensional array object, various derived objects (such as masked arrays and matrices), and an assortment of routines for fast operations on arrays, including mathematical, logical, shape manipulation, sorting, selecting, I/O, discrete Fourier transforms, basic linear algebra, basic statistical operations, random simulation and much more.
+
+Internally, Numpy implements most of the operators in C, not in Python, making them orders of magnitude faster than plain Python code.
+
+Let's recap the most basic functionality here.
+
+%% Cell type:markdown id: tags:
+
+## Q2.1: Arrays
+The basic building block of Numpy is the (multidimensional) array.
+Zero-dimensional arrays are effectively scalars, and you can think of 1D and 2D arrays as vectors and matrices, respectively.
+Going to higher dimensions, you may think of them as collections of matrices or matrices with multi-dimensional components.
+
+%% Cell type:markdown id: tags:
+
+You can cast any list or tuple into a Numpy array.
+
+%% Cell type:code id: tags:
+
+``` python
+print(np.array([[1, 2], [3, 4]]))
+```
+
+%% Cell type:markdown id: tags:
+
+When debugging, it is often helpful to inspect the shape of an array.
+
+%% Cell type:code id: tags:
+
+``` python
+# create an array of the given shape filled with ones
+shape = (2, 3, 4)
+# create an array filled with ones
+a = np.ones(shape)
+print(a)
+print(a.shape)
+```
+
+%% Cell type:markdown id: tags:
+
+Sometimes, we want to reshape an array, for example, to transpose a matrix, convert a grid into a list, or add unit dimensions for broadcasting (see below for examples of broadcasting).
+
+%% Cell type:code id: tags:
+
+``` python
+# -1 lets numpy calculate the size of the axis
+b = np.arange(24).reshape(-1, 6)
+print("b:", b.shape, "\n", b)
+
+# indexing with a number yields the sub-array at that index
+print("b[1]:", b[1].shape, "\n", b[1])
+print("b[1, 2]:", b[1, 2].shape, "\n", b[1, 2])
+
+# you can use slices for indexing
+print("b[:, 1]", b[:, 1].shape, "\n", b[:, 1])
+
+# or an ellipsis as shorthand for keeping remaining dimensions
+print("b[..., -1]:", b[..., -1].shape, "\n", b[..., -1])
+
+# indexing with None introduces a unit dimension, which is useful for broadcasting
+print("b[None, ...]:", b[None, ...].shape, "\n", b[None, ...])
+```
+
+%% Cell type:markdown id: tags:
+
+Most mathematical functions operate element-wise on arrays, that is, they are applied to each entry of the array individually.
+
+%% Cell type:code id: tags:
+
+``` python
+print((b - 5) ** 2)
+```
+
+%% Cell type:markdown id: tags:
+
+Reduction operations, such as `sum`, `max`, and `mean`, reduce the array to a scalar.
+However, sometimes we want to apply the reduction in parallel over some axis, for example, to compute the maximum entry of a list of vectors.
+We can use the `axis` keyword to specify the axis over which the reduction is applied, starting with the first (left-most) axis with `axis=0`.
+Negative values for `axis` count from the right.
+
+%% Cell type:code id: tags:
+
+``` python
+print(b.sum())
+print(b.sum(axis=0))
+print(b.sum(axis=-1))
+# sometimes it is useful to not squeeze the reduced dimensions
+print(b.sum(keepdims=True))
+```
+
+%% Cell type:markdown id: tags:
+
+Matrix multiplication can be done with the `@` operator:
+
+%% Cell type:code id: tags:
+
+``` python
+c = b.reshape(a.shape)
+# use array.T to inverse the dimensions
+print(b.shape, b.T.shape)
+# use array.transpose to arbitrarily shuffle dimensions
+print(c.transpose(0, 2, 1) @ (a + 1))
+```
+
+%% Cell type:markdown id: tags:
+
+## Q2.2: Broadcasting
+A very convenient feature of Numpy arrays is [broadcasting](https://numpy.org/doc/stable/user/basics.broadcasting.html).
+Broadcasting tries to match the shapes of multiple arrays by introducing new axes or "inflating" unit dimensions and then applies the same operation over all created dimensions (you can find a more detailed description in the linked documentation page).
+This is much more efficient than writing a loop doing the same thing in Python.
+
+For example, consider applying a linear operation (i.e., multiplying a matrix) to a set of datapoints.
+
+%% Cell type:code id: tags:
+
+``` python
+from time import time
+
+# lots of 8-dimensional datapoints
+a = np.ones((100000, 8))
+# the matrix representing the transformation
+t = np.ones((8, 8))
+
+start = time()
+out = np.zeros((a.shape[0], t.shape[0]))
+for i in range(a.shape[0]):
+    # Have to do some shenanigans to make the shapes match
+    out[i] = (t @ a[i, :, None]).squeeze()
+print("Python loop:", time() - start, "seconds")
+
+start = time()
+# here we only add a unit dimension to view the data as 8x1 matrices
+out = t @ a[..., None]
+print("Broadcasting:", time() - start, "seconds")
+```
+
+%% Cell type:markdown id: tags:
+
+Even in this simple example, the Numpy version is much faster.
+Additionally, it makes the code simpler by removing unneccessary control structures.
+
+%% Cell type:markdown id: tags:
+
+## Q2.3: Random Numbers
+Sometimes, our algorithms make use of randomness, for example, drawing a random subset of data or generating samples according to some distribution.
+To this end, we can use Numpy's [random generator](https://numpy.org/doc/stable/reference/random/generator.html).
+
+The generator produces pseudo-random numbers - when initialized with the same seed, the sequence of numbers will be the same.
+When you run the cell below several times, you can observe that the seeded generator always produces the same samples.
+
+%% Cell type:code id: tags:
+
+``` python
+rng1 = np.random.default_rng(seed=42)
+rng2 = np.random.default_rng()
+
+mean, var = 0, 1
+shape = (100, 2)
+samples1 = rng1.normal(mean, var, shape)
+samples2 = rng2.normal(mean, var, shape)
+
+plt.scatter(*samples1.T, label="Fixed seed")
+plt.scatter(*samples2.T, label="Random seed")
+plt.legend(loc="upper left")
+plt.ylim(-3, 3)
+plt.xlim(-3, 3)
+plt.show()
+```
+
+%% Cell type:markdown id: tags:
+
+We can visualize the distributions using histograms, a technique that you will learn more about in the next chapter.
+For now, we just use the implementation available in matplotlib.
+
+Try different distributions and see what they look like; you can check the [documentation](https://numpy.org/doc/stable/reference/random/generator.html) to see which ones are available.
+
+%% Cell type:code id: tags:
+
+``` python
+rng = np.random.default_rng()
+
+samples = rng.normal(size=10000)
+plt.hist(samples, density=True)
+plt.show()
+```
+
+%% Cell type:markdown id: tags:
+
+## Warming up - Probability Theory Basics
+
+%% Cell type:markdown id: tags:
+
+Suppose that we have three colored boxes $r$ (red), $g$ (green), and $b$ (blue).
+Box $r$ contains 3 apples, 4 oranges, and 3 limes, box $g$ contains 3 apples, 3 oranges, and 4 limes, and box $b$ contains 1 apple, 1 orange, and 0 limes.
+A box is chosen at random with probabilities $p(r) = 0.2$, $p(g) = 0.6$, $p(b) = 0.2$, and a piece of fruit is removed from the box (with equal
+probability of selecting any of the items in the box).
+
+%% Cell type:markdown id: tags:
+
+#### Important Statistical Formulas
+
+Rules of probability:
+    $$
+    \begin{aligned}
+        p(x) = \sum_y p(x, y)\\
+        p(x, y) = p(y|x)p(x)\\
+    \end{aligned}
+    $$
+
+Bayes rule:
+    $$
+    \begin{aligned}
+        p(y|x) = \frac{p(x|y)p(y)}{p(x)}\\
+		= \frac{p(x|y)p(y)}{\sum_{y'}p(x|y')p(y')}
+	\end{aligned}
+    $$
+
+%% Cell type:markdown id: tags:
+
+(a) What is the probability of selecting an apple?
+
+%% Cell type:markdown id: tags:
+
+(b) If we observe that the selected fruit is in fact an orange, what is the probability that
+it came from the green box?
+
